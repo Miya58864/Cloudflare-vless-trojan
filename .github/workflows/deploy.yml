@@ -8,31 +8,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Debug and Deploy
+      - name: Deploy with Wrangler
         env:
           CF_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CF_ACCOUNT_ID }}
         run: |
           set -e
-          echo "=== Runner Info ==="
-          echo "CF_TOKEN length: ${#CF_TOKEN}"
-          echo "CF_ACCOUNT: $CF_ACCOUNT"
-          
-          echo "=== Verifying CF Token ==="
-          VERIFY=$(curl -sf "https://api.cloudflare.com/client/v4/user/tokens/verify" -H "Authorization: Bearer ${CF_TOKEN}" 2>&1) || true
-          echo "Token verify: $VERIFY"
-          
-          echo "=== Uploading Worker (strict mode) ==="
-          HTTP_CODE=$(curl -s -o /tmp/cf_response.json -w "%{http_code}" -X PUT \
-            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/workers/scripts/vless-worker-2026" \
-            -H "Authorization: Bearer ${CF_TOKEN}" \
-            -F 'metadata={"main_module":"_worker.js","usage_model":"bundled","compatibility_date":"2023-10-30"};type=application/json' \
-            -F "_worker.js=@worker/_worker.js;type=application/javascript+module")
-          echo "HTTP Code: $HTTP_CODE"
-          cat /tmp/cf_response.json | python3 -m json.tool 2>/dev/null | head -30 || cat /tmp/cf_response.json | head -5
-          
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "DEPLOY FAILED with HTTP $HTTP_CODE"
-            exit 1
-          fi
-          echo "DEPLOY SUCCESS!"
+          echo Token length: ${#CF_TOKEN}
+          echo Account ID length: ${#CF_ACCOUNT}
+          echo === Verify token ===
+          curl -sf https://api.cloudflare.com/client/v4/user/tokens/verify -H "Authorization: Bearer ${CF_TOKEN}"
+          echo ''
+          echo === List workers test ===
+          L=$(curl -s -o /tmp/l.json -w "%{http_code}" https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/workers/scripts -H "Authorization: Bearer ${CF_TOKEN}")
+          echo List HTTP: $L
+          cat /tmp/l.json
+          echo === Deploy with wrangler ===
+          npm install -g wrangler 2>&1 | tail -3
+          cd worker
+          CLOUDFLARE_API_TOKEN=${CF_TOKEN} CLOUDFLARE_ACCOUNT_ID=${CF_ACCOUNT} wrangler deploy _worker.js --name vless-worker-2026 --compatibility-date 2023-10-30 --no-bundle 2>&1
