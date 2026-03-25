@@ -1,0 +1,4 @@
+name = "vless-worker-2026"
+main = "_worker.js"
+compatibility_date = "2023-10-30"
+account_id = "a21639eef5a542e228134055f025456d"
