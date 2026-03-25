@@ -8,9 +8,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: worker
+      - name: Deploy to Cloudflare Workers via curl
+        env:
+          CF_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          echo "Uploading worker script..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/workers/scripts/vless-worker-2026" \
+            -H "Authorization: Bearer ${CF_TOKEN}" \
+            -F 'metadata={"main_module":"_worker.js","usage_model":"bundled","compatibility_date":"2023-10-30"};type=application/json' \
+            -F '_worker.js=@worker/_worker.js;type=application/javascript+module')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Deploy SUCCESS!"
+          else
+            echo "Deploy FAILED!"
+            exit 1
+          fi
