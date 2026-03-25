@@ -13,18 +13,26 @@ jobs:
           CF_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CF_ACCOUNT_ID }}
         run: |
-          echo "=== Debug Info ==="
+          set -e
+          echo "=== Runner Info ==="
           echo "CF_TOKEN length: ${#CF_TOKEN}"
           echo "CF_ACCOUNT: $CF_ACCOUNT"
-          echo "Runner IP:"
-          curl -s https://ifconfig.me || echo "Cannot get IP"
-          echo ""
+          
           echo "=== Verifying CF Token ==="
-          curl -s -H "Authorization: Bearer ${CF_TOKEN}" https://api.cloudflare.com/client/v4/user/tokens/verify
-          echo ""
-          echo "=== Uploading Worker ==="
-          curl -v -X PUT \
+          VERIFY=$(curl -sf "https://api.cloudflare.com/client/v4/user/tokens/verify" -H "Authorization: Bearer ${CF_TOKEN}" 2>&1) || true
+          echo "Token verify: $VERIFY"
+          
+          echo "=== Uploading Worker (strict mode) ==="
+          HTTP_CODE=$(curl -s -o /tmp/cf_response.json -w "%{http_code}" -X PUT \
             "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/workers/scripts/vless-worker-2026" \
             -H "Authorization: Bearer ${CF_TOKEN}" \
             -F 'metadata={"main_module":"_worker.js","usage_model":"bundled","compatibility_date":"2023-10-30"};type=application/json' \
-            -F '_worker.js=@worker/_worker.js;type=application/javascript+module'
+            -F "_worker.js=@worker/_worker.js;type=application/javascript+module")
+          echo "HTTP Code: $HTTP_CODE"
+          cat /tmp/cf_response.json | python3 -m json.tool 2>/dev/null | head -30 || cat /tmp/cf_response.json | head -5
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "DEPLOY FAILED with HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "DEPLOY SUCCESS!"
