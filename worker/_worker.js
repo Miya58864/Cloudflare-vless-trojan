@@ -1,5 +1,5 @@
-// Minimal VLESS WebSocket worker - battle tested version
-// Based on: https://github.com/zizifn/edgetunnel
+// @ts-ignore
+import { connect } from 'cloudflare:sockets';
 
 const UUID = 'ffde63e1-e924-4477-a496-d68402a09caf';
 
@@ -110,8 +110,7 @@ async function vlessOverWSHandler(request) {
 }
 
 async function handleTCPOutBound(remoteSocket, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log) {
-  async function connectAndWrite(address, port) {
-    const { connect } = await import('cloudflare:sockets');
+async function connectAndWrite(address, port) {
     const tcpSocket = connect({
       hostname: address,
       port: port,
